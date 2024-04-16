@@ -1,21 +1,23 @@
 const User = require("../models/userModel");
-const bcrypt = require("bcrypt");
+
 
 module.exports.login = async(req, res, next) => {
     try {
         const { username, password } = req.body;
         const user = await User.findOne({ username });
-        if (!user)
+
+        if (!user || user.password !== password) {
+            // If user doesn't exist or password doesn't match
             return res.json({ msg: "Incorrect Username or Password", status: false });
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid)
-            return res.json({ msg: "Incorrect Username or Password", status: false });
+        }
+
         delete user.password;
         return res.json({ status: true, user });
     } catch (ex) {
         next(ex);
     }
 };
+
 
 module.exports.register = async(req, res, next) => {
     try {
@@ -26,11 +28,11 @@ module.exports.register = async(req, res, next) => {
         const emailCheck = await User.findOne({ email });
         if (emailCheck)
             return res.json({ msg: "Email already used", status: false });
-        const hashedPassword = await bcrypt.hash(password, 12); // Increased rounds to 12
+        // No password hashing needed
         const user = await User.create({
             email,
             username,
-            password: hashedPassword,
+            password,
         });
         delete user.password;
         return res.json({ status: true, user });
@@ -53,6 +55,24 @@ module.exports.getAllUsers = async(req, res, next) => {
     }
 };
 
+module.exports.setAvatar = async(req, res, next) => {
+    try {
+        const userId = req.params.id;
+        const avatarImage = req.body.image;
+        const userData = await User.findByIdAndUpdate(
+            userId, {
+                isAvatarImageSet: true,
+                avatarImage,
+            }, { new: true }
+        );
+        return res.json({
+            isSet: userData.isAvatarImageSet,
+            image: userData.avatarImage,
+        });
+    } catch (ex) {
+        next(ex);
+    }
+};
 
 module.exports.logOut = (req, res, next) => {
     try {
@@ -60,6 +80,6 @@ module.exports.logOut = (req, res, next) => {
         onlineUsers.delete(req.params.id);
         return res.status(200).send();
     } catch (ex) {
-        next(ex); // Log or handle the error here
+        next(ex);
     }
 };
